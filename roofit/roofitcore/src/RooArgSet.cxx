@@ -49,7 +49,6 @@
 
 #include "RooArgSet.h"
 
-#include "TClass.h"
 #include "RooStreamParser.h"
 #include "RooFormula.h"
 #include "RooAbsRealLValue.h"
@@ -217,9 +216,7 @@ RooArgSet::RooArgSet(const RooArgSet& set1, const RooArgSet& set2, const char *n
 RooArgSet::RooArgSet(const TCollection& tcoll, const char* name) :
   RooAbsCollection(name)
 {
-  TIterator* iter = tcoll.MakeIterator() ;
-  TObject* obj ;
-  while((obj=iter->Next())) {
+  for(TObject* obj : tcoll) {
     if (!dynamic_cast<RooAbsArg*>(obj)) {
       coutW(InputArguments) << "RooArgSet::RooArgSet(TCollection) element " << obj->GetName()
              << " is not a RooAbsArg, ignored" << endl ;
@@ -227,7 +224,6 @@ RooArgSet::RooArgSet(const TCollection& tcoll, const char* name) :
     }
     add(*(RooAbsArg*)obj) ;
   }
-  delete iter ;
   TRACE_CREATE
 }
 

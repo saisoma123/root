@@ -23,15 +23,16 @@
 #include "RooNormSetCache.h"
 #include "RooObjCacheManager.h"
 
+class AddCacheElem;
+
 class RooAddModel : public RooResolutionModel {
 public:
 
   RooAddModel() ;
   RooAddModel(const char *name, const char *title, const RooArgList& pdfList, const RooArgList& coefList, bool ownPdfList=false) ;
-  RooAddModel(const RooAddModel& other, const char* name=0) ;
+  RooAddModel(const RooAddModel& other, const char* name=nullptr) ;
   TObject* clone(const char* newname) const override { return new RooAddModel(*this,newname) ; }
   RooResolutionModel* convolution(RooFormulaVar* basis, RooAbsArg* owner) const override ;
-  ~RooAddModel() override ;
 
   double evaluate() const override ;
   bool checkObservables(const RooArgSet* nset) const override ;
@@ -42,8 +43,8 @@ public:
     // Force RooRealIntegral to offer all observables for internal integration
     return true ;
   }
-  Int_t getAnalyticalIntegralWN(RooArgSet& allVars, RooArgSet& numVars, const RooArgSet* normSet, const char* rangeName=0) const override ;
-  double analyticalIntegralWN(Int_t code, const RooArgSet* normSet, const char* rangeName=0) const override ;
+  Int_t getAnalyticalIntegralWN(RooArgSet& allVars, RooArgSet& numVars, const RooArgSet* normSet, const char* rangeName=nullptr) const override ;
+  double analyticalIntegralWN(Int_t code, const RooArgSet* normSet, const char* rangeName=nullptr) const override ;
 
   /// Model is self normalized when used as p.d.f
   bool selfNormalized() const override {
@@ -84,36 +85,22 @@ public:
 protected:
 
   friend class RooAddGenContext ;
-  RooAbsGenContext* genContext(const RooArgSet &vars, const RooDataSet *prototype=0,
-                                       const RooArgSet* auxProto=0, bool verbose= false) const override ;
+  RooAbsGenContext* genContext(const RooArgSet &vars, const RooDataSet *prototype=nullptr,
+                                       const RooArgSet* auxProto=nullptr, bool verbose= false) const override ;
 
-  void selectNormalization(const RooArgSet* depSet=0, bool force=false) override ;
-  void selectNormalizationRange(const char* rangeName=0, bool force=false) override ;
+  void selectNormalization(const RooArgSet* depSet=nullptr, bool force=false) override ;
+  void selectNormalizationRange(const char* rangeName=nullptr, bool force=false) override ;
 
   mutable RooSetProxy _refCoefNorm ;   ///<! Reference observable set for coefficient interpretation
-  mutable TNamed* _refCoefRangeName ;  ///<! Reference range name for coefficient interpretation
+  mutable TNamed* _refCoefRangeName = nullptr;  ///<! Reference range name for coefficient interpretation
 
-  bool _projectCoefs ;         ///< If true coefficients need to be projected for use in evaluate()
-  mutable double* _coefCache ; ///<! Transiet cache with transformed values of coefficients
+  bool _projectCoefs = false;  ///< If true coefficients need to be projected for use in evaluate()
+  mutable std::vector<double> _coefCache; ///<! Transiet cache with transformed values of coefficients
 
 
-  class CacheElem : public RooAbsCacheElement {
-  public:
-    ~CacheElem() override {} ;
-
-    RooArgList _suppNormList ;     ///< Supplemental normalization list
-
-    RooArgList _projList ;         ///< Projection integrals to be multiplied with coefficients
-    RooArgList _suppProjList ;     ///< Projection integrals to be multiplied with coefficients for supplemental normalization terms
-    RooArgList _refRangeProjList ; ///< Range integrals to be multiplied with coefficients (reference range)
-    RooArgList _rangeProjList ;    ///< Range integrals to be multiplied with coefficients (target range)
-
-    RooArgList containedArgs(Action) override ;
-
-  } ;
   mutable RooObjCacheManager _projCacheMgr ;  ///<! Manager of cache with coefficient projections and transformations
-  CacheElem* getProjCache(const RooArgSet* nset, const RooArgSet* iset=0, const char* rangeName=0) const ;
-  void updateCoefficients(CacheElem& cache, const RooArgSet* nset) const ;
+  AddCacheElem* getProjCache(const RooArgSet* nset, const RooArgSet* iset=nullptr, const char* rangeName=nullptr) const ;
+  void updateCoefficients(AddCacheElem& cache, const RooArgSet* nset) const ;
 
   typedef RooArgList* pRooArgList ;
   void getCompIntList(const RooArgSet* nset, const RooArgSet* iset, pRooArgList& compIntList, Int_t& code, const char* isetRangeName) const ;
@@ -126,14 +113,14 @@ protected:
 
   mutable RooObjCacheManager _intCacheMgr ; ///<! Manager of cache with integrals
 
-  mutable RooAICRegistry _codeReg ;  ///<! Registry of component analytical integration codes
+  mutable RooAICRegistry _codeReg = 10; ///<! Registry of component analytical integration codes
 
   RooListProxy _pdfList ;   ///<  List of component PDFs
   RooListProxy _coefList ;  ///<  List of coefficients
   mutable RooArgList* _snormList{nullptr};  ///<!  List of supplemental normalization factors
 
-  bool _haveLastCoef ;    ///<  Flag indicating if last PDFs coefficient was supplied in the ctor
-  bool _allExtendable ;   ///<  Flag indicating if all PDF components are extendable
+  bool _haveLastCoef = false;    ///<  Flag indicating if last PDFs coefficient was supplied in the ctor
+  bool _allExtendable = false;   ///<  Flag indicating if all PDF components are extendable
 
   mutable Int_t _coefErrCount ; ///<! Coefficient error counter
 

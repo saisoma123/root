@@ -18,21 +18,20 @@
 
 #include "Rtypes.h"
 #include "RooAbsBinning.h"
-class TIterator ;
 
 class RooUniformBinning : public RooAbsBinning {
 public:
 
-  RooUniformBinning(const char* name=0) ;
-  RooUniformBinning(double xlo, double xhi, Int_t nBins, const char* name=0) ;
-  RooUniformBinning(const RooUniformBinning& other, const char* name=0) ;
-  RooAbsBinning* clone(const char* name=0) const override { return new RooUniformBinning(*this,name?name:GetName()) ; }
+  RooUniformBinning(const char* name=nullptr) ;
+  RooUniformBinning(double xlo, double xhi, Int_t nBins, const char* name=nullptr) ;
+  RooUniformBinning(const RooUniformBinning& other, const char* name=nullptr) ;
+  RooAbsBinning* clone(const char* name=nullptr) const override { return new RooUniformBinning(*this,name?name:GetName()) ; }
   ~RooUniformBinning() override ;
 
   void setRange(double xlo, double xhi) override ;
 
   Int_t numBoundaries() const override { return _nbins + 1 ; }
-  Int_t binNumber(double x) const override  ;
+  void binNumbers(double const * x, int * bins, std::size_t n, int coef) const override;
   bool isUniform() const override { return true ; }
 
   double lowBound() const override { return _xlo ; }

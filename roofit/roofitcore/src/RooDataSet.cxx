@@ -90,7 +90,6 @@ the new `RooAbsData::uniqueId()`.
 #include "RooCategory.h"
 #include "RooFormulaVar.h"
 #include "RooArgList.h"
-#include "RooAbsRealLValue.h"
 #include "RooRealVar.h"
 #include "RooDataHist.h"
 #include "RooMsgService.h"
@@ -106,7 +105,6 @@ the new `RooAbsData::uniqueId()`.
 
 #include "Math/Util.h"
 #include "TTree.h"
-#include "TH2.h"
 #include "TFile.h"
 #include "TBuffer.h"
 #include "strlcpy.h"
@@ -309,12 +307,12 @@ RooDataSet::RooDataSet(RooStringView name, RooStringView title, const RooArgSet&
       char tmp[64000];
       strlcpy(tmp, lnkSliceNames, 64000);
       char *token = strtok(tmp, ",");
-      TIterator *hiter = lnkSliceData.MakeIterator();
+      auto hiter = lnkSliceData.begin();
       while (token) {
-        hmap[token] = (RooAbsData *)hiter->Next();
+        hmap[token] = static_cast<RooAbsData *>(*hiter);
         token = strtok(0, ",");
+        ++hiter;
       }
-      delete hiter ;
     }
 
     // Lookup name of weight variable if it was specified by object reference
@@ -391,11 +389,11 @@ RooDataSet::RooDataSet(RooStringView name, RooStringView title, const RooArgSet&
     // Make import mapping if index category is specified
     map<string,RooDataSet*> hmap ;
     if (indexCat) {
-      TIterator* hiter = impSliceData.MakeIterator() ;
+      auto hiter = impSliceData.begin() ;
       for (const auto& token : ROOT::Split(impSliceNames, ",")) {
-        hmap[token] = (RooDataSet*) hiter->Next() ;
+        hmap[token] = static_cast<RooDataSet*>(*hiter);
+        ++hiter;
       }
-      delete hiter ;
     }
 
     // process StoreError requests
@@ -488,7 +486,7 @@ RooDataSet::RooDataSet(RooStringView name, RooStringView title, const RooArgSet&
       } else if (fname && strlen(fname)) {
 
         // Case 5a --- Import TTree from file with cutspec
-        TFile *f = TFile::Open(fname) ;
+        std::unique_ptr<TFile> f{TFile::Open(fname)};
         if (!f) {
           coutE(InputArguments) << "RooDataSet::ctor(" << GetName() << ") ERROR file '" << fname << "' cannot be opened or does not exist" << endl ;
           throw string(Form("RooDataSet::ctor(%s) ERROR file %s cannot be opened or does not exist",GetName(),fname)) ;
@@ -546,7 +544,7 @@ RooDataSet::RooDataSet(RooStringView name, RooStringView title, const RooArgSet&
         }
       } else if (fname && strlen(fname)) {
         // Case 5b --- Import TTree from file with cutvar
-        TFile *f = TFile::Open(fname) ;
+        std::unique_ptr<TFile> f{TFile::Open(fname)};
         if (!f) {
           coutE(InputArguments) << "RooDataSet::ctor(" << GetName() << ") ERROR file '" << fname << "' cannot be opened or does not exist" << endl ;
           throw string(Form("RooDataSet::ctor(%s) ERROR file %s cannot be opened or does not exist",GetName(),fname)) ;

@@ -73,7 +73,6 @@
 #include "RooMinimizer.h"
 #include "RooChi2Var.h"
 #include "RooFitResult.h"
-#include "RooAbsMoment.h"
 #include "RooMoment.h"
 #include "RooFirstMoment.h"
 #include "RooSecondMoment.h"
@@ -178,32 +177,6 @@ RooAbsReal::RooAbsReal(const RooAbsReal& other, const char* name) :
     _specIntegratorConfig = 0 ;
   }
 }
-
-
-////////////////////////////////////////////////////////////////////////////////
-/// Assign values, name and configs from another RooAbsReal.
-RooAbsReal& RooAbsReal::operator=(const RooAbsReal& other) {
-  RooAbsArg::operator=(other);
-
-  _plotMin = other._plotMin;
-  _plotMax = other._plotMax;
-  _plotBins = other._plotBins;
-  _value = other._value;
-  _unit = other._unit;
-  _label = other._label;
-  _forceNumInt = other._forceNumInt;
-  _selectComp = other._selectComp;
-  _lastNSet = other._lastNSet;
-
-  if (other._specIntegratorConfig) {
-    _specIntegratorConfig = new RooNumIntConfig(*other._specIntegratorConfig);
-  } else {
-    _specIntegratorConfig = nullptr;
-  }
-
-  return *this;
-}
-
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2045,14 +2018,9 @@ RooPlot* RooAbsReal::plotOn(RooPlot *frame, PlotOpt o) const
     projectedVars.remove(projDataVars,true,true) ;
   }
 
-  // Clone the plot variable
-  RooAbsReal* realVar = (RooRealVar*) frame->getPlotVar() ;
-  RooArgSet* plotCloneSet = (RooArgSet*) RooArgSet(*realVar).snapshot(true) ;
-  if (!plotCloneSet) {
-    coutE(Plotting) << "RooAbsReal::plotOn(" << GetName() << ") Couldn't deep-clone self, abort," << endl ;
-    return frame ;
-  }
-  RooRealVar* plotVar = (RooRealVar*) plotCloneSet->find(realVar->GetName());
+  // Get the plot variable and remember its original value
+  auto* plotVar = static_cast<RooRealVar*>(frame->getPlotVar());
+  double oldPlotVarVal = plotVar->getVal();
 
   // Inform user about projections
   if (projectedVars.getSize()) {
@@ -2082,15 +2050,11 @@ RooPlot* RooAbsReal::plotOn(RooPlot *frame, PlotOpt o) const
   // WVE take out conditional observables
   if (checkObservables(&deps)) {
     coutE(Plotting) << "RooAbsReal::plotOn(" << GetName() << ") error in checkObservables, abort" << endl ;
-    delete plotCloneSet ;
     if (projDataNeededVars) delete projDataNeededVars ;
     return frame ;
   }
 
-  RooArgSet normSet(deps) ;
-  //normSet.add(projDataVars) ;
-
-  RooAbsReal *projection = (RooAbsReal*) createPlotProjection(normSet, &projectedVars, projectionCompList, o.projectionRangeName) ;
+  RooAbsReal *projection = (RooAbsReal*) createPlotProjection(deps, &projectedVars, projectionCompList, o.projectionRangeName) ;
   cxcoutD(Plotting) << "RooAbsReal::plotOn(" << GetName() << ") plot projection object is " << projection->GetName() << endl ;
   if (dologD(Plotting)) {
     projection->printStream(ccoutD(Plotting),0,kVerbose) ;
@@ -2323,7 +2287,7 @@ RooPlot* RooAbsReal::plotOn(RooPlot *frame, PlotOpt o) const
 
   if (projDataNeededVars) delete projDataNeededVars ;
   delete projectionCompList ;
-  delete plotCloneSet ;
+  plotVar->setVal(oldPlotVarVal); // reset the plot variable value to not disturb the original state
   return frame;
 }
 
@@ -3418,16 +3382,15 @@ bool RooAbsReal::matchArgsByName(const RooArgSet &allArgs, RooArgSet &matchedArg
               const TList &nameList) const
 {
   RooArgSet matched("matched");
-  TIterator *iterator= nameList.MakeIterator();
-  TObjString *name = 0;
   bool isMatched(true);
-  while((isMatched && (name= (TObjString*)iterator->Next()))) {
+  for(auto * name : static_range_cast<TObjString*>(nameList)) {
     RooAbsArg *found= allArgs.find(name->String().Data());
     if(found) {
       matched.add(*found);
     }
     else {
       isMatched= false;
+      break;
     }
   }
 
@@ -3437,7 +3400,6 @@ bool RooAbsReal::matchArgsByName(const RooArgSet &allArgs, RooArgSet &matchedArg
     isMatched = false ;
   }
 
-  delete iterator;
   if(isMatched) matchedArgs.add(matched);
   return isMatched;
 }
@@ -4368,16 +4330,13 @@ RooAbsReal* RooAbsReal::createChi2(RooDataHist& data, const RooLinkedList& cmdLi
 {
   // Fill array of commands
   const RooCmdArg* cmds[8] ;
-  TIterator* iter = cmdList.MakeIterator() ;
   Int_t i(0) ;
-  RooCmdArg* arg ;
-  while((arg=(RooCmdArg*)iter->Next())) {
+  for(auto * arg : static_range_cast<RooCmdArg*>(cmdList)) {
     cmds[i++] = arg ;
   }
   for (;i<8 ; i++) {
     cmds[i] = &RooCmdArg::none() ;
   }
-  delete iter ;
 
   return createChi2(data,*cmds[0],*cmds[1],*cmds[2],*cmds[3],*cmds[4],*cmds[5],*cmds[6],*cmds[7]) ;
 

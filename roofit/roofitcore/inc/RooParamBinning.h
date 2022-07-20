@@ -20,21 +20,20 @@
 #include "RooAbsBinning.h"
 #include "RooRealVar.h"
 #include "RooListProxy.h"
-class TIterator ;
 
 class RooParamBinning : public RooAbsBinning {
 public:
 
-  RooParamBinning(const char* name=0) ;
-  RooParamBinning(RooAbsReal& xlo, RooAbsReal& xhi, Int_t nBins, const char* name=0) ;
-  RooParamBinning(const RooParamBinning& other, const char* name=0) ;
-  RooAbsBinning* clone(const char* name=0) const override { return new RooParamBinning(*this,name?name:GetName()) ; }
+  RooParamBinning(const char* name=nullptr) ;
+  RooParamBinning(RooAbsReal& xlo, RooAbsReal& xhi, Int_t nBins, const char* name=nullptr) ;
+  RooParamBinning(const RooParamBinning& other, const char* name=nullptr) ;
+  RooAbsBinning* clone(const char* name=nullptr) const override { return new RooParamBinning(*this,name?name:GetName()) ; }
   ~RooParamBinning() override ;
 
   void setRange(double xlo, double xhi) override ;
 
   Int_t numBoundaries() const override { return _nbins + 1 ; }
-  Int_t binNumber(double x) const override  ;
+  void binNumbers(double const * x, int * bins, std::size_t n, int coef) const override;
 
   double lowBound() const override { return xlo()->getVal() ; }
   double highBound() const override { return xhi()->getVal() ; }

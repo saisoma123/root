@@ -21,14 +21,14 @@
 class RooRangeBinning : public RooAbsBinning {
 public:
 
-  RooRangeBinning(const char* name=0) ;
-  RooRangeBinning(double xmin, double xmax, const char* name=0) ;
-  RooRangeBinning(const RooRangeBinning&, const char* name=0) ;
-  RooAbsBinning* clone(const char* name=0) const override { return new RooRangeBinning(*this,name?name:GetName()) ; }
+  RooRangeBinning(const char* name=nullptr) ;
+  RooRangeBinning(double xmin, double xmax, const char* name=nullptr) ;
+  RooRangeBinning(const RooRangeBinning&, const char* name=nullptr) ;
+  RooAbsBinning* clone(const char* name=nullptr) const override { return new RooRangeBinning(*this,name?name:GetName()) ; }
   ~RooRangeBinning() override ;
 
   Int_t numBoundaries() const override { return 2 ; }
-  Int_t binNumber(double) const override { return 0 ; }
+  void binNumbers(double const * /*x*/, int * /*bins*/, std::size_t /*n*/, int /*coef*/) const override {}
   double binCenter(Int_t) const override { return (_range[0] + _range[1]) / 2 ; }
   double binWidth(Int_t) const override { return (_range[1] - _range[0]) ; }
   double binLow(Int_t) const override { return _range[0] ; }

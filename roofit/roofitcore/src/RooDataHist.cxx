@@ -336,20 +336,22 @@ RooDataHist::RooDataHist(RooStringView name, RooStringView title, const RooArgLi
 
       // Initialize importing mapped set of TH1s
       std::map<std::string,TH1*> hmap ;
-      TIter hiter = impSliceHistos.MakeIterator() ;
+      auto hiter = impSliceHistos.begin() ;
       for (const auto& token : ROOT::Split(impSliceNames, ",")) {
-        auto histo = static_cast<TH1*>(hiter.Next());
+        auto histo = static_cast<TH1*>(*hiter);
         assert(histo);
         hmap[token] = histo;
+        ++hiter;
       }
       importTH1Set(vars,*indexCat,hmap,initWgt,false) ;
     } else {
 
       // Initialize importing mapped set of RooDataHists
       std::map<std::string,RooDataHist*> dmap ;
-      TIter hiter = impSliceDHistos.MakeIterator() ;
+      auto hiter = impSliceDHistos.begin() ;
       for (const auto& token : ROOT::Split(impSliceDNames, ",")) {
-        dmap[token] = (RooDataHist*) hiter.Next() ;
+        dmap[token] = static_cast<RooDataHist*>(*hiter);
+        ++hiter;
       }
       importDHistSet(vars,*indexCat,dmap,initWgt) ;
     }
@@ -1140,6 +1142,33 @@ RooPlot *RooDataHist::plotOn(RooPlot *frame, PlotOpt o) const
   return RooAbsData::plotOn(frame,o) ;
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+/// A vectorized version of RooDataHist::weight for one dimensional histograms 
+/// with no interpolation. 
+/// \param[out] output An array of weights corresponding the values in xVals.
+/// \param[in] xVals An array of coordinates for which the weights should be
+///                  calculated.
+/// \param[in] correctForBinSize Enable the inverse bin volume correction factor.
+
+void RooDataHist::weights(double* output, RooSpan<double const> xVals, bool correctForBinSize) 
+{
+  auto const nEvents = xVals.size();
+  RooAbsBinning const& binning = *_lvbins[0];
+
+  // Reuse the output buffer for bin indices and zero-initialize it
+  auto binIndices = reinterpret_cast<int*>(output + nEvents) - nEvents; 
+  std::fill(binIndices, binIndices + nEvents, 0);
+
+  binning.binNumbers(xVals.data(), binIndices, nEvents);
+
+  for (std::size_t i=0; i < nEvents; ++i) {
+    auto binIdx = binIndices[i];
+    output[i] = correctForBinSize ? _wgt[binIdx] / _binv[binIdx] : _wgt[binIdx];
+  }
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 /// A faster version of RooDataHist::weight that assumes the passed arguments
 /// are aligned with the histogram variables.
@@ -1241,7 +1270,6 @@ double RooDataHist::weightInterpolated(const RooArgSet& bin, int intOrder, bool 
 
   double wInt{0} ;
   if (varInfo.nRealVars == 1) {
-
     // buffer needs to be 2 x (interpolation order + 1), with the factor 2 for x and y.
     _interpolationBuffer.resize(2 * intOrder + 2);
 

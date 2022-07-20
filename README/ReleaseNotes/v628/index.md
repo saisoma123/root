@@ -53,6 +53,7 @@ Please use their non-experimental counterparts `ROOT::TBufferMerger` and `ROOT::
   intended. Related to it was the `RooDataHist::cacheValidEntries()` function, which is removed as well.
   The preferred way to reduce RooFit datasets to subranges is [RooAbsData::reduce()](https://root.cern.ch/doc/v628/classRooAbsData.html#acfa7b31e5cd751eec1bc4e95d2796390).
 - The longtime-deprecated `RooStats::HistFactory::EstimateSummary` class is removed, including the functions that use it. The information that it was meant to store is managed by the `RooStats::HistFactory::Measurement` object since many years.
+- The `RooSuperCategory::MakeIterator()` function that was deprecated since 6.22 is now removed. Please use range-based loops to iterate over the category states.
 
 
 ## Core Libraries
@@ -123,6 +124,20 @@ hfCfg.binnedFitOptimization = false;
 RooStats::HistFactory::MakeModelAndMeasurementFast(measurement, hfCfg);
 ```
 
+### Disable copy assignment for RooAbsArg and derived types
+
+Copy assignment for RooAbsArgs was implemented in an unexpected and
+inconsistent way. While one would expect that the copy assignment is copying
+the object, it said in the documentation of `RooAbsArg::operator=` that it will
+"assign all boolean and string properties of the original bject. Transient
+properties and client-server links are not assigned." This contradicted with
+the implementation, where the server links were actually copied too.
+Furthermore, in `RooAbsRealLValue`, the assigment operator was overloaded by a
+function that only assigns the value of another `RooAbsReal`.
+
+With all these inconsistencies, it was deemed safer to disable copy assignment
+of RooAbsArgs from now on.
+
 ### Removal of deprecated HistFactory functionality
 
 #### Removal of HistoToWorkspaceFactory (non-Fast version)
@@ -159,6 +174,11 @@ overload. Also, the aforementioned deprecation warning is not printed anymore.
 The `RooAbsMinimizerFcn` class and its implementation `RooMinimizerFcn` were removed from the public interface.
 These classes are implementation details of the RooMinimizer and should not be used in your code.
 In the unlikely case that this causes any problem for you, please open a GitHub issue requesting to extend the RooMinimizer by the needed functionality.
+
+### Vectorize `RooAbsBinning` interface for bin index lookups
+
+The `RooAbsBinning` interface for bin index lookups was changed to enable vectorized implementations.
+Instead of having the override `RooAbsBinning::binNumber()`, the binning implementations now have to override the `RooAbsBinning::binNumbers()` function to evaluate the bin indices of multiple values in one function call.
 
 ## 2D Graphics Libraries
 

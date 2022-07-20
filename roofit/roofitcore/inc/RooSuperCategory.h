@@ -29,7 +29,7 @@ public:
   // Constructors etc.
   RooSuperCategory();
   RooSuperCategory(const char *name, const char *title, const RooArgSet& inputCatList);
-  RooSuperCategory(const RooSuperCategory& other, const char *name=0) ;
+  RooSuperCategory(const RooSuperCategory& other, const char *name=nullptr) ;
   TObject* clone(const char* newname) const override { return new RooSuperCategory(*this,newname); }
   ~RooSuperCategory() override { };
 
@@ -41,8 +41,6 @@ public:
   // Printing interface (human readable)
   void printMultiline(std::ostream& os, Int_t content, bool verbose=false, TString indent="") const override;
 
-  /// \deprecated Use begin(), end() or range-based for loops to iterate through state names.
-  TIterator* MakeIterator() const ;
   const RooArgSet& inputCatList() const { return _multiCat->inputCatList(); }
 
   bool inRange(const char* rangeName) const override;

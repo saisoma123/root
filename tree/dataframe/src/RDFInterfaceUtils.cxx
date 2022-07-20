@@ -37,6 +37,7 @@
 #endif
 
 #include <algorithm>
+#include <cassert>
 #include <unordered_set>
 #include <stdexcept>
 #include <string>
@@ -142,7 +143,7 @@ static ParsedExpression ParseRDFExpression(std::string_view expr, const ColumnNa
       "(^|\\W)#(?!(ifdef|ifndef|if|else|elif|endif|pragma|define|undef|include|line))([a-zA-Z_][a-zA-Z0-9_]*)");
    colSizeReplacer.Substitute(preProcessedExpr, "$1R_rdf_sizeof_$3", "g");
 
-   const auto usedColsAndAliases =
+   auto usedColsAndAliases =
       FindUsedColumns(std::string(preProcessedExpr), treeBranchNames, customColumns, dataSourceColNames);
 
    auto escapeDots = [](const std::string &s) {
@@ -157,6 +158,14 @@ static ParsedExpression ParseRDFExpression(std::string_view expr, const ColumnNa
    // when we are done, exprWithVars willl be the same as preProcessedExpr but column names will be substituted with
    // the dummy variable names in varNames
    TString exprWithVars(preProcessedExpr);
+
+   // sort the vector usedColsAndAliases by decreasing length of its elements,
+   // so in case of friends we guarantee we never substitute a column name with another column containing it
+   // ex. without sorting when passing "x" and "fr.x", the replacer would output "var0" and "fr.var0",
+   // because it has already substituted "x", hence the "x" in "fr.x" would be recognized as "var0",
+   // whereas the desired behaviour is handling them as "var0" and "var1"
+   std::sort(usedColsAndAliases.begin(), usedColsAndAliases.end(),
+             [](const std::string &a, const std::string &b) { return a.size() > b.size(); });
    for (const auto &colOrAlias : usedColsAndAliases) {
       const auto col = customColumns.ResolveAlias(colOrAlias);
       unsigned int varIdx; // index of the variable in varName corresponding to col
@@ -296,43 +305,6 @@ static std::string RetTypeOfFunc(const std::string &funcName)
    return type;
 }
 
-static void GetTopLevelBranchNamesImpl(TTree &t, std::set<std::string> &bNamesReg, ColumnNames_t &bNames,
-                                       std::set<TTree *> &analysedTrees, const std::string friendName = "")
-{
-   if (!analysedTrees.insert(&t).second) {
-      return;
-   }
-
-   auto branches = t.GetListOfBranches();
-   if (branches) {
-      for (auto branchObj : *branches) {
-         const auto name = branchObj->GetName();
-         if (bNamesReg.insert(name).second) {
-            bNames.emplace_back(name);
-         } else if (!friendName.empty()) {
-            // If this is a friend and the branch name has already been inserted, it might be because the friend
-            // has a branch with the same name as a branch in the main tree. Let's add it as <friendname>.<branchname>.
-            // If used for a Snapshot, this name will become <friendname>_<branchname> (with an underscore).
-            const auto longName = friendName + "." + name;
-            if (bNamesReg.insert(longName).second)
-               bNames.emplace_back(longName);
-         }
-      }
-   }
-
-   auto friendTrees = t.GetListOfFriends();
-
-   if (!friendTrees)
-      return;
-
-   for (auto friendTreeObj : *friendTrees) {
-      auto friendElement = static_cast<TFriendElement *>(friendTreeObj);
-      auto friendTree = friendElement->GetTree();
-      const std::string frName(friendElement->GetName()); // this gets us the TTree name or the friend alias if any
-      GetTopLevelBranchNamesImpl(*friendTree, bNamesReg, bNames, analysedTrees, frName);
-   }
-}
-
 [[noreturn]] void
 ThrowJitBuildActionHelperTypeError(const std::string &actionTypeNameBase, const std::type_info &helperArgType)
 {
@@ -429,17 +401,6 @@ void CheckValidCppVarName(std::string_view var, const std::string &where)
                          "\". Not a valid C++ variable name.";
       throw std::runtime_error(error);
    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// Get all the top-level branches names, including the ones of the friend trees
-ColumnNames_t GetTopLevelBranchNames(TTree &t)
-{
-   std::set<std::string> bNamesSet;
-   ColumnNames_t bNames;
-   std::set<TTree *> analysedTrees;
-   GetTopLevelBranchNamesImpl(t, bNamesSet, bNames, analysedTrees);
-   return bNames;
 }
 
 std::string DemangleTypeIdName(const std::type_info &typeInfo)
@@ -980,6 +941,55 @@ void CheckForDuplicateSnapshotColumns(const ColumnNames_t &cols)
 /// member of the input argument. It is intended for internal use only.
 void TriggerRun(ROOT::RDF::RNode &node){
    node.fLoopManager->Run();
+}
+
+/// Return copies of colsWithoutAliases and colsWithAliases with size branches for variable-sized array branches added
+/// in the right positions (i.e. before the array branches that need them).
+std::pair<std::vector<std::string>, std::vector<std::string>>
+AddSizeBranches(const std::vector<std::string> &branches, TTree *tree, std::vector<std::string> &&colsWithoutAliases,
+                std::vector<std::string> &&colsWithAliases)
+{
+   if (!tree) // nothing to do
+      return {std::move(colsWithoutAliases), std::move(colsWithAliases)};
+
+   assert(colsWithoutAliases.size() == colsWithAliases.size());
+
+   auto nCols = colsWithoutAliases.size();
+   // Use index-iteration as we modify the vector during the iteration. 
+   for (std::size_t i = 0u; i < nCols; ++i) {
+      const auto &colName = colsWithoutAliases[i];
+      if (!IsStrInVec(colName, branches))
+         continue; // this column is not a TTree branch, nothing to do
+
+      auto *b = tree->GetBranch(colName.c_str());
+      if (!b) // try harder
+         b = tree->FindBranch(colName.c_str());
+      assert(b != nullptr);
+      auto *leaves = b->GetListOfLeaves();
+      if (b->IsA() != TBranch::Class() || leaves->GetEntries() != 1)
+         continue; // this branch is not a variable-sized array, nothing to do
+
+      TLeaf *countLeaf = static_cast<TLeaf *>(leaves->At(0))->GetLeafCount();
+      if (!countLeaf || IsStrInVec(countLeaf->GetName(), colsWithoutAliases))
+         continue; // not a variable-sized array or the size branch is already there, nothing to do
+
+      // otherwise we must insert the size in colsWithoutAliases _and_ colsWithAliases
+      colsWithoutAliases.insert(colsWithoutAliases.begin() + i, countLeaf->GetName());
+      colsWithAliases.insert(colsWithAliases.begin() + i, countLeaf->GetName());
+      ++nCols;
+      ++i; // as we inserted an element in the vector we iterate over, we need to move the index forward one extra time
+   }
+
+   return {std::move(colsWithoutAliases), std::move(colsWithAliases)};
+}
+
+void RemoveDuplicates(ColumnNames_t &columnNames)
+{
+   std::set<std::string> uniqueCols;
+   columnNames.erase(
+      std::remove_if(columnNames.begin(), columnNames.end(),
+                     [&uniqueCols](const std::string &colName) { return !uniqueCols.insert(colName).second; }),
+      columnNames.end());
 }
 
 } // namespace RDF

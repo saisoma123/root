@@ -33,10 +33,7 @@ implementations like RooAcceptReject and RooFoam
 #include "RooRandom.h"
 #include "RooErrorHandler.h"
 
-#include "TString.h"
-#include "TIterator.h"
 #include "RooMsgService.h"
-#include "TClass.h"
 #include "RooRealBinding.h"
 
 #include <assert.h>

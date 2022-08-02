@@ -8,11 +8,10 @@
 #ifndef RooProofDriverSelector_h
 #define RooProofDriverSelector_h
 
-#include <TChain.h>
-#include <TFile.h>
 #include <TSelector.h>
+#include <TTree.h>
+
 class RooStudyPackage ;
-class TIterator ;
 
 class RooProofDriverSelector : public TSelector {
 public :

@@ -45,10 +45,16 @@ int main(){
    RModel modelConv2D_Same = TMVA::Experimental::SOFIE::PyKeras::Parse("KerasModelConv2D_Same.h5");
    modelConv2D_Same.Generate();
    modelConv2D_Same.OutputGenerated("KerasConv2D_Same.hxx");
+ 
    //Emitting header file for Keras model with Reshape layer
    RModel modelReshape = TMVA::Experimental::SOFIE::PyKeras::Parse("KerasModelReshape.h5");
    modelReshape.Generate();
    modelReshape.OutputGenerated("KerasReshapeModel.hxx");
+
+   //Emitting header file for Keras model with Concatenate layer
+   RModel modelConcatenate = TMVA::Experimental::SOFIE::PyKeras::Parse("KerasModelConcatenate.h5");
+   modelConcatenate.Generate();
+   modelConcatenate.OutputGenerated("KerasConcatenateModel.hxx");
 
    return 0;
 }

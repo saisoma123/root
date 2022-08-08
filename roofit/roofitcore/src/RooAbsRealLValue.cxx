@@ -185,16 +185,6 @@ RooAbsArg& RooAbsRealLValue::operator=(double newValue)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Assignment operator from other RooAbsReal
-
-RooAbsArg& RooAbsRealLValue::operator=(const RooAbsReal& arg)
-{
-  return operator=(arg.getVal()) ;
-}
-
-
-
-////////////////////////////////////////////////////////////////////////////////
 /// Create a new RooPlot on the heap with a drawing frame initialized for this
 /// object, but no plot contents. Use x.frame() as the first argument to a
 /// y.plotOn(...) method, for example. The caller is responsible for deleting
@@ -457,10 +447,8 @@ void RooAbsRealLValue::setBin(Int_t ibin, const char* rangeName)
   }
 
   // Set value to center of requested bin
-  setVal(getBinning(rangeName).binCenter(ibin)) ;
+  setValFast(getBinning(rangeName).binCenter(ibin)) ;
 }
-
-
 
 
 
@@ -470,10 +458,8 @@ void RooAbsRealLValue::setBin(Int_t ibin, const char* rangeName)
 void RooAbsRealLValue::setBin(Int_t ibin, const RooAbsBinning& binning)
 {
   // Set value to center of requested bin
-  setVal(binning.binCenter(ibin)) ;
+  setValFast(binning.binCenter(ibin)) ;
 }
-
-
 
 
 
@@ -485,20 +471,6 @@ void RooAbsRealLValue::randomize(const RooAbsBinning& binning)
 {
   double range= binning.highBound() - binning.lowBound() ;
   setVal(binning.lowBound() + RooRandom::uniform()*range);
-}
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-/// Set value to center of bin 'ibin' of binning 'rangeName' (or of
-/// default binning if no range is specified)
-
-void RooAbsRealLValue::setBinFast(Int_t ibin, const RooAbsBinning& binning)
-{
-  // Set value to center of requested bin
-  setValFast(binning.binCenter(ibin)) ;
 }
 
 

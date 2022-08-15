@@ -282,6 +282,16 @@ public:
    /// // String: it must contain valid C++ except that column names can be used instead of variable names
    /// auto filtered = df.Filter("x*y > 0");
    /// ~~~
+   ///
+   /// \note If the body of the string expression contains an explicit `return` statement (even if it is in a nested
+   /// scope), RDataFrame _will not_ add another one in front of the expression. So this will not work:
+   /// ~~~{.cpp}
+   /// df.Filter("Sum(Map(vec, [](float e) { return e*e > 0.5; }))")
+   /// ~~~
+   /// but instead this will:
+   /// ~~~{.cpp}
+   /// df.Filter("return Sum(Map(vec, [](float e) { return e*e > 0.5; }))")
+   /// ~~~
    template <typename F, std::enable_if_t<!std::is_convertible<F, std::string>::value, int> = 0>
    RInterface<RDFDetail::RFilter<F, Proxied>, DS_t>
    Filter(F f, const ColumnNames_t &columns = {}, std::string_view name = "")
@@ -343,6 +353,16 @@ public:
    /// auto filtered_df = df.Filter("myCollection.size() > 3");
    /// auto filtered_name_df = df.Filter("myCollection.size() > 3", "Minumum collection size");
    /// ~~~
+   ///
+   /// \note If the body of the string expression contains an explicit `return` statement (even if it is in a nested
+   /// scope), RDataFrame _will not_ add another one in front of the expression. So this will not work:
+   /// ~~~{.cpp}
+   /// df.Filter("Sum(Map(vec, [](float e) { return e*e > 0.5; }))")
+   /// ~~~
+   /// but instead this will:
+   /// ~~~{.cpp}
+   /// df.Filter("return Sum(Map(vec, [](float e) { return e*e > 0.5; }))")
+   /// ~~~
    RInterface<RDFDetail::RJittedFilter, DS_t> Filter(std::string_view expression, std::string_view name = "")
    {
       // deleted by the jitted call to JitFilterHelper
@@ -386,6 +406,16 @@ public:
    /// // alternatively, we can pass the body of the function as a string, as in Filter:
    /// auto df_with_define = df.Define("newColumn", "x*x + y*y");
    /// ~~~
+   ///
+   /// \note If the body of the string expression contains an explicit `return` statement (even if it is in a nested
+   /// scope), RDataFrame _will not_ add another one in front of the expression. So this will not work:
+   /// ~~~{.cpp}
+   /// df.Define("x2", "Map(v, [](float e) { return e*e; })")
+   /// ~~~
+   /// but instead this will:
+   /// ~~~{.cpp}
+   /// df.Define("x2", "return Map(v, [](float e) { return e*e; })")
+   /// ~~~
    template <typename F, typename std::enable_if_t<!std::is_convertible<F, std::string>::value, int> = 0>
    RInterface<Proxied, DS_t> Define(std::string_view name, F expression, const ColumnNames_t &columns = {})
    {
@@ -414,7 +444,7 @@ public:
    /// df.DefineSlot("x", function, {"column1", "column2"})
    /// ~~~
    ///
-   /// See Define for more information.
+   /// See Define() for more information.
    template <typename F>
    RInterface<Proxied, DS_t> DefineSlot(std::string_view name, F expression, const ColumnNames_t &columns = {})
    {
@@ -444,7 +474,7 @@ public:
    /// DefineSlotEntry("x", function, {"column1", "column2"})
    /// ~~~
    ///
-   /// See Define for more information.
+   /// See Define() for more information.
    template <typename F>
    RInterface<Proxied, DS_t> DefineSlotEntry(std::string_view name, F expression, const ColumnNames_t &columns = {})
    {
@@ -462,6 +492,16 @@ public:
    /// The expression is just-in-time compiled and used to produce the column entries.
    /// It must be valid C++ syntax in which variable names are substituted with the names
    /// of branches/columns.
+   ///
+   /// \note If the body of the string expression contains an explicit `return` statement (even if it is in a nested
+   /// scope), RDataFrame _will not_ add another one in front of the expression. So this will not work:
+   /// ~~~{.cpp}
+   /// df.Define("x2", "Map(v, [](float e) { return e*e; })")
+   /// ~~~
+   /// but instead this will:
+   /// ~~~{.cpp}
+   /// df.Define("x2", "return Map(v, [](float e) { return e*e; })")
+   /// ~~~
    ///
    /// Refer to the first overload of this method for the full documentation.
    RInterface<Proxied, DS_t> Define(std::string_view name, std::string_view expression)
@@ -1120,7 +1160,7 @@ public:
    {
       const auto definedColumns = fColRegister.GetNames();
       auto *tree = fLoopManager->GetTree();
-      const auto treeBranchNames = tree != nullptr ? RDFInternal::GetTopLevelBranchNames(*tree) : ColumnNames_t{};
+      const auto treeBranchNames = tree != nullptr ? ROOT::Internal::TreeUtils::GetTopLevelBranchNames(*tree) : ColumnNames_t{};
       const auto dsColumns = fDataSource ? fDataSource->GetColumnNames() : ColumnNames_t{};
       // Ignore R_rdf_sizeof_* columns coming from datasources: we don't want to Snapshot those
       ColumnNames_t dsColumnsWithoutSizeColumns;
@@ -1263,7 +1303,8 @@ public:
    {
       const auto definedColumns = fColRegister.GetNames();
       auto *tree = fLoopManager->GetTree();
-      const auto treeBranchNames = tree != nullptr ? RDFInternal::GetTopLevelBranchNames(*tree) : ColumnNames_t{};
+      const auto treeBranchNames =
+         tree != nullptr ? ROOT::Internal::TreeUtils::GetTopLevelBranchNames(*tree) : ColumnNames_t{};
       const auto dsColumns = fDataSource ? fDataSource->GetColumnNames() : ColumnNames_t{};
       // Ignore R_rdf_sizeof_* columns coming from datasources: we don't want to Snapshot those
       ColumnNames_t dsColumnsWithoutSizeColumns;
